@@ -6,3 +6,8 @@ target/
 *.iml
 .vscode/
 *.log
+
+# Pruebas automaticas: no forman parte de la entrega.
+src/test/
+# Clase auxiliar que rompia la compilacion por no implementar los metodos abstractos.
+Prueba1.java

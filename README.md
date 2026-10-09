@@ -1,244 +1,239 @@
 # Ciudad interactiva ampliada
 
-Ampliación de una ciudad 3D con LWJGL y OpenGL 3.3, en Java y Maven. El mapa original
-de 7x7 se amplía a 11x11 conservando el tamaño de celda, con iluminación día/noche,
-decoración urbana, minimapa, entregas y panel de información dentro de la ventana.
+Ciudad 3D en Java con LWJGL y OpenGL 3.3. El mapa original de 7x7 celdas se amplía a
+11x11 conservando el tamaño de celda, con iluminación día/noche, decoración urbana,
+semáforos animados, minimapa, entregas y tráfico autónomo.
 
-- JDK 17 o superior y Maven.
-- Sin recursos externos: la geometría, los colores y hasta la tipografía del panel se
-  generan con código. No hay imágenes, modelos, fuentes ni sonidos.
+Todo se genera con código a partir de un único cubo unitario de 36 vértices: sin
+imágenes, modelos, tipografías ni sonidos.
+
+## Requisitos
+
+- JDK 17 o superior
+- Maven
+- Un controlador gráfico con OpenGL 3.3 en modo *core*
 
 ## Ejecutar
+
+La versión final es `CiudadCompleta`. Desde este directorio:
 
 ```sh
 mvn compile exec:exec
 ```
 
-Ese comando abre la versión final (`CiudadCompleta`). Cada etapa tiene su propia clase
-y su propio `main`, y se lanza cambiando el nombre de la clase:
+Cada etapa tiene su propia clase `main` y se lanza indicando cuál:
 
 ```sh
-mvn compile exec:exec -DmainClass=grafica.ciudad.Motor           # parte 1
-mvn compile exec:exec -DmainClass=grafica.ciudad.Ciudad          # parte 2
-mvn compile exec:exec -DmainClass=grafica.ciudad.Conduccion      # parte 3
-mvn compile exec:exec -DmainClass=grafica.ciudad.Iluminacion      # parte 4
-mvn compile exec:exec -DmainClass=grafica.ciudad.CiudadCompleta   # parte 5
+mvn compile exec:exec -DmainClass=grafica.ciudad.Motor           # parte 1, cubo de prueba
+mvn compile exec:exec -DmainClass=grafica.ciudad.Ciudad          # parte 2, la ciudad
+mvn compile exec:exec -DmainClass=grafica.ciudad.Conduccion      # parte 3, conducción
+mvn compile exec:exec -DmainClass=grafica.ciudad.Iluminacion      # parte 4, luces
+mvn compile exec:exec -DmainClass=grafica.ciudad.CiudadCompleta   # parte 5, versión final
 ```
 
-Comprobación de la lógica sin abrir ventana (mapa, colisiones, entregas y contenido
-del panel):
+Para una comprobación gráfica corta, añade `-Ddemo.frames=N`: la ventana se dibuja
+durante `N` cuadros y se cierra sola. Es lo que sirve para comprobar que los shaders
+compilan y que no hay errores de OpenGL.
+
+```sh
+mvn compile exec:exec -Ddemo.frames=20
+```
+
+Pruebas de lógica, sin abrir ventana:
 
 ```sh
 mvn test
 ```
 
-Comprobación gráfica corta: añade `-Ddemo.frames=20` a cualquiera de los comandos
-anteriores y la ventana se cierra sola tras veinte cuadros. Es lo que se usa para
-comprobar que los shaders compilan y que no hay errores OpenGL.
+Para empaquetar un jar único con todas las dependencias dentro:
 
-En macOS el perfil de Maven añade `-XstartOnFirstThread`. Si se ejecuta desde un IDE en
-Mac, hay que añadir ese argumento a las opciones de la JVM.
+```sh
+mvn package
+java -jar target/ciudad-1.0.0.jar
+```
+
+En macOS GLFW necesita ejecutarse en el primer hilo del proceso Java. El `pom.xml` lo
+resuelve con un perfil que se activa solo en Mac; si ejecutas desde un IDE en Mac,
+añade `-XstartOnFirstThread` a las opciones de la JVM a mano. Los detalles están en la
+sección siguiente.
+
+## Ejecutar en macOS
+
+macOS necesita dos cosas que Linux no: GLFW debe correr en el primer hilo del proceso
+Java, y hay que descargar los binarios nativos de LWJGL para macOS. El `pom.xml` ya
+trae un perfil que resuelve ambas cosas, así que desde la terminal los comandos son los
+mismos de siempre.
+
+### Desde la terminal
+
+```sh
+mvn compile exec:exec
+```
+
+El perfil `macos` del `pom.xml` se activa solo (`<os><family>mac</family></os>`) y
+añade por su cuenta el argumento `-XstartOnFirstThread` y las dependencias de binarios
+nativos. No hay que escribir nada distinto en el comando.
+
+Para las demás etapas y para la comprobación corta:
+
+```sh
+mvn compile exec:exec -DmainClass=grafica.ciudad.Ciudad
+mvn compile exec:exec -Ddemo.frames=20
+```
+
+Y las pruebas, que no abren ventana y no necesitan nada especial:
+
+```sh
+mvn test
+```
+
+### Desde un IDE
+
+El perfil solo afecta a Maven. Si lanzas la clase desde IntelliJ, Eclipse o VS Code
+tienes que añadir el argumento a mano:
+
+- **IntelliJ**: `Run` → `Edit Configurations` → en `VM options`, `-XstartOnFirstThread`
+- **Eclipse**: `Run Configurations` → `Arguments` → `VM arguments`, `-XstartOnFirstThread`
+- **VS Code**: en `launch.json`, en `"vmArgs"`, `"-XstartOnFirstThread"`
+
+### Desde el jar empaquetado
+
+El perfil no cubre el jar, porque ahí el comando es `java` y no Maven. El argumento
+hay que ponerlo a mano:
+
+```sh
+mvn package
+java -XstartOnFirstThread -jar target/ciudad-1.0.0.jar
+```
+
+Sin ese argumento, GLFW aborta con un aviso del tipo
+`Exception in thread "main" java.lang.IllegalStateException: GLFW is not initialized`
+o bien falla al inicializar la biblioteca.
+
+### Apple Silicon
+
+El perfil declara los dos juegos de binarios, `natives-macos` (Intel, `macos/x64`) y
+`natives-macos-arm64` (Apple Silicon, `macos/arm64`). LWJGL elige la carpeta que
+corresponde a la arquitectura en tiempo de carga, así que el mismo comando funciona en
+los dos tipos de Mac sin cambiar nada.
+
+### Problemas frecuentes
+
+| Síntoma | Causa | Solución |
+|---|---|---|
+| `UnsatisfiedLinkError` al arrancar | Faltan los binarios nativos de macOS | Comprueba que se está usando Maven y no el classpath del IDE, para que el perfil añada las dependencias |
+| `GLFW is not initialized` | GLFW está en un hilo que no es el principal | Añade `-XstartOnFirstThread` a las opciones de la JVM |
+| Ventana en blanco o negro | Controlador sin OpenGL 3.3 en modo core | Actualiza el driver; en Mac, la GPU debe tener al menos 3.3 |
+| Aviso de LWJGL sobre la versión de JNI | El JDK del sistema es el 25 y el *toolchain* es el 21 | No afecta al resultado; usa el JDK 17 para silenciarlo |
+
+En macOS el contexto se crea con `GLFW_OPENGL_FORWARD_COMPAT` activado, que es
+obligatorio en los contextos modernos de Apple y por eso está puesto en el código.
 
 ## Controles
 
 | Tecla | Acción |
 |---|---|
-| W / S o arriba / abajo | Acelerar, frenar y dar marcha atrás |
-| A / D o izquierda / derecha | Girar mientras el auto se mueve |
-| Espacio | Freno |
+| W / S o flechas ↑ ↓ | Acelerar, frenar y dar marcha atrás |
+| A / D o flechas ← → | Girar mientras el vehículo se mueve |
+| Espacio | Freno de mayor intensidad |
 | C | Cámara de seguimiento / aérea oblicua |
-| R | Reiniciar el vehículo y las entregas |
+| R | Reiniciar vehículo, tráfico y entregas |
 | N | Ambiente diurno / nocturno |
-| F | Encender / apagar los faros del vehículo |
+| F | Encender / apagar los faros |
 | M | Mostrar / ocultar el minimapa |
-| ESC | Salir |
+| ESC | Cerrar la ventana |
 
-En la parte 2 las flechas horizontales orbitan la ciudad; a partir de la parte 3
-dirigen el volante. El título de la ventana muestra siempre la parte, los controles,
-la velocidad en km/h, el ambiente, el estado de los faros y el progreso de las entregas.
+En la parte 2, antes de que exista el vehículo, las flechas horizontales orbitan la
+cámara. El título de la ventana muestra siempre la parte, los controles y los
+indicadores de estado.
 
-La partida consiste en tres entregas: hay que llegar a menos de tres unidades del
-destino dorado **frenando** (menos de una unidad por segundo) para completarla.
+La partida son tres entregas: hay que llegar a menos de 3 unidades del destino dorado
+**frenando** (por debajo de 1 unidad por segundo) para completarla.
 
-## Diseño de la ciudad
-
-Cada celda mide `10` unidades, igual que en el mapa de 7x7. Con 11 celdas por lado la
-ciudad ocupa `110 x 110` unidades y el centro de cada celda está a 55 del origen:
-
-```text
-                 X -55 ................................ +55
-   Z -50  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  avenida del borde norte
-          │ E │ E │ P │ E │ E │          filas de manzana en los índices impares
-   Z -30  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-          │ P │ E │ E │ P │ E │
-   Z -10  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  avenida central
-          │ E │ P │ E │ E │ P │
-   Z +10  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  avenida del borde sur
-          │ E │ E │ E │ E │ P │          sector nuevo al sur
-   Z +30  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-          │ P │ E │ E │ E │ E │          sector nuevo al sureste
-   Z +50  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-```
-
-- Las calles ocupan los índices **pares** de filas y columnas: seis avenidas en cada
-  eje, totalmente conectadas entre sí.
-- Las manzanas ocupan los índices **impares**: `5 x 5 = 25` parcelas, de las que
-  **18 llevan edificio y 7 son parques** (el enunciado pide 12 y 4).
-- El 7x7 original se conserva **intacto** en la esquina noroeste (filas y columnas
-  0 a 6) y todo lo demás son sectores nuevos al este y al sur.
-- Las alturas de los edificios varían entre 6 y 22 unidades y los tonos cambian con la
-  fila y la columna; los del sureste llevan tres unidades más de altura.
-- Cada manzana tiene acera de diez unidades, y los edificios ocupan siete, de modo que
-  la acera queda visible alrededor.
-- Cada edificio es un cuerpo con el alto y el tono que le tocan, más las ventanas de sus
-  cuatro fachadas. No lleva cornisa ni remates: el enunciado solo pide variación de
-  altura y color, y ventanas que aparenten encenderse de noche.
-
-## Iluminación
-
-- **Ambiente**: `N` alterna entre día y noche. La luz ambiental diurna es 0,48 y la
-  nocturna 0,12/0,16/0,24, con el sol sustituido por una fuente débil y azulada.
-- **Farolas**: 10 bombillas en el bordillo de la acera de diez manzanas distintas —las
-  esquinas de las manzanas que rodean a los cruces—, a una unidad del límite y mirando a
-  la calle; el enunciado pide nueve. El poste arranca en la acera, a 0,3 de altura, y no
-  en el suelo del asfalto. El poste y la bombilla se dibujan en las mismas posiciones que
-  se envían al shader, así que la luz coincide con el objeto visible. El alcance es de 22
-  unidades y el shader descarta antes las bombillas que no llegan, para no pagar diez
-  bucles en cada fragmento.
-- **Faros del vehículo**: dos focos con cono (`smoothstep` entre 0,85 y 0,97), alcance
-  de 26 unidades y atenuación cuadrática. Se encienden y apagan con `F`.
-- **Emisión frente a luz recibida**: `uEmision` permite que la bombilla y el halo de los
-  faros conserven su color sin ser iluminados. Ese brillo es emisión visual, no el
-  mismo fenómeno que la luz que recibe el suelo o las fachadas.
-- La luz difusa usa las normales de cada cara (`max(dot(normal, dirección), 0)`), por
-  lo que un muro y el suelo reciben cantidades distintas del mismo foco.
-
-## Decoración urbana
-
-- **Parques**: cuatro árboles y un banco en cada una de las siete manzanas de parque.
-- **Edificios**: ventanas en las cuatro fachadas, con un piso cada tres unidades y dos
-  por fachada. De noche se encienden tres de cada cinco, según una semilla que depende de la
-  manzana, la fachada y el piso, para que el barrio no quede plano. El vidrio apagado es el
-  45% del tono del cuerpo, no un color fijo, para que la retícula se lea igual en los
-  dieciocho edificios.
-- **Pasos peatonales**: siete franjas blancas sobre la calle contigua al norte de cada
-  manzana.
-- **Semáforos**: uno de cada tres manzanas, con ciclo de diez segundos (rojo 0-4,
-  verde 4-8, amarillo 8-10) controlado por el reloj de la simulación. Son decorativos:
-  cambian de color pero no detienen al vehículo.
-
-## Tráfico autónomo
-
-Tres coches que circulan solos por la ciudad, cada uno con su posición, su rumbo y su
-velocidad, y con un color y un ritmo distintos (verde, azul y amarilla; 9, 11 y 8 u/s).
-
-- **Ruta**: se mueven por el centro de las celdas de calle y saltan de intersección en
-  intersección, así que por construcción no pueden entrar en una manzana. Además, antes
-  de aceptar la posición nueva se consulta `puedeCircular()`, el mismo método que usa el
-  vehículo del jugador: si el mapa cambiara, el tráfico se detendría en vez de embarrar.
-- **Frenada y giro**: la velocidad objetivo es la curva de frenada clásica
-  (`sqrt(2 * deceleracion * distancia)`), de modo que llegan a la esquina a punto de parar,
-  giran noventa grados a 3,2 rad/s y vuelven a acelerar. Nunca dan media vuelta, y si ya
-  giraron en la esquina anterior prefieren seguir recto para no dar bandos.
-- **No se atraviesan entre ellos ni con el jugador**: hay tres reglas que lo garantizan.
-  Las avenidas son de **un solo sentido**, alternadas por parejas, así que dos coches nunca
-  se encuentran de frente. El que va detrás frena al de delante y **deja además cinco
-  unidades de margen**, porque si solo se detuvieran al tocar, el que espera se quedaría
-  en medio del cruce y el otro no tendría por dónde pasar. En un cruce, cede el de índice
-  mayor, de modo que siempre hay alguien con paso libre y nadie queda atascado. El jugador
-  manda sobre todos: el tráfico se aparta y su coche frena contra ellos igual que contra
-  un edificio, sin rebote.
-- Si el jugador se queda **parado en mitad de una avenida**, los coches se acumulan detrás
-  de él y esperan hasta que se mueve. Es lo que hace un tráfico real con un coche parado,
-  y `R` despeja la situación.
-- Se reinician con `R`, junto con el resto de la partida.
-
-## Minimapa y panel
-
-- El minimapa aparece en la esquina superior derecha y se oculta con `M`. Se dibuja en
-  un segundo pase, con `glScissor` para no borrar la vista principal, `glViewport`
-  propio y la proyección ortográfica del shader (`uMapa = 1`), con el norte hacia arriba
-  y toda la ciudad ampliada dentro del recuadro. El encuadre se recalcula en cada cuadro
-  a partir de `ancho` y `alto`, así que se mantiene al redimensionar la ventana.
-- Muestra el vehículo como una marca cian orientada con una punta blanca por delante, y
-  el destino activo en dorado.
-- El panel de información ocupa la esquina superior izquierda. Se dibuja con el tercer
-  modo de proyección del shader (`uMapa = 2`), que trabaja en píxeles y por eso no
-  necesita cambiar el viewport: solo el recorte y desactivar la profundidad, ya que el
-  fondo 3D está escrito en esa zona. Muestra velocidad con su barra, ambiente, faros,
-  progreso de las entregas, destino y distancia, y una ayuda de controles.
-- La tipografía es una fuente de mapa de bits 3x5 dibujada con cajas: cada punto
-  encendido es un cubo del tamaño de un píxel. No se usa ninguna fuente externa.
-
-## Reinicio
-
-`R` devuelve el vehículo a la intersección de partida, con velocidad cero, y vuelve a
-activar la primera entrega, de modo que se puede repetir el recorrido completo tantas
-veces como haga falta.
-
-## Organización del código
+## Estructura
 
 ```text
 Motor         ventana, ciclo de dibujo, cubo unitario, uniforms, shaders
   └─ Ciudad        mapa 11x11, suelo, aceras, manzanas, marcas viales, cámara aérea
-       └─ Conduccion     auto, conducción, colisiones, cámaras, reinicio
-            └─ Iluminacion     día y noche, farolas, faros, shader de luz
+       └─ Conduccion    vehículo, conducción, colisiones, cámaras, reinicio
+            └─ Iluminacion    día y noche, farolas, faros, shader de luz
                  └─ CiudadCompleta  entregas, decoración, semáforos, minimapa, panel
-Texto         fuente 3x5 para el panel (utilidad, no es una etapa)
+Texto         fuente de mapa de bits 3x5 para el panel
+Trafico       los tres coches autónomos
+construcciones/  Edificio, Auto, Farola, Parque, Semaforo
 ```
 
-Cada etapa es ejecutable por separado, reutiliza la anterior con `super` y anuncia su
-número en el título de la ventana.
+Cada etapa reutiliza la anterior con `super` y añade una sola responsabilidad.
 
-## Progreso
+## La ciudad
 
-| Parte | Contenido | Estado | Verificado con |
-|---|---|---|---|
-| 1 | `Motor`: ventana, ciclo, cubo unitario, uniforms, shaders con tres proyecciones | completada | ventana real, 8 cuadros, sin errores OpenGL |
-| 2 | `Ciudad`: mapa 11x11, suelo, aceras, edificios, parques, marcas viales, cámara aérea | completada | 7 pruebas de mapa en verde, 10 cuadros dibujados |
-| 3 | `Conduccion`: auto, conducción, colisiones, cámaras, reinicio | completada | 6 pruebas de colisión en verde, 40 cuadros dibujados |
-| 4 | `Iluminacion`: día y noche, 16 farolas, faros del vehículo | completada | 5 pruebas de farolas en verde, shader GLSL compilado, 300 cuadros a ~50 fps |
-| 5 | `CiudadCompleta`: entregas, decoración, semáforos, minimapa, panel | completada | 6 pruebas de entregas y panel en verde, lectura de píxeles del framebuffer |
-| 6 | `Trafico`: tres coches autónomos con ruta, frenada, giro y colisiones | completada | 14 pruebas de tráfico en verde, 38 pruebas en total |
+| | Celdas | Mínimo pedido |
+|---|---|---|
+| Manzanas con edificio | 18 | 12 |
+| Parques | 7 | 4 |
+| Celdas de calle | 96 | — |
+| Farolas | 10 | 9 |
+
+Cada celda mide 10 unidades, así que la ciudad ocupa 110 x 110 con el centro en el
+origen. Las calles ocupan los índices pares de filas y columnas y las manzanas los
+impares, de modo que la red vial queda conectada y toda manzana está rodeada de calle.
+El 7x7 original se conserva intacto en la esquina noroeste.
+
+## Cómo se dibuja
+
+Todo sale de un solo cubo de 36 vértices cargado una vez en la GPU (864 bytes). Cada
+pieza envía cuatro uniforms y lanza un dibujado:
+
+```java
+vector("uPos",   x, y, z);         // dónde se coloca
+vector("uEscala", sx, sy, sz);     // qué tamaño tiene
+vector("uColor",  r, g, b);        // de qué color se pinta
+decimal("uGiro",  angulo);         // hacia dónde mira
+glDrawArrays(GL_TRIANGLES, 0, 36); // siempre los mismos 36 vértices
+```
+
+Un vehículo son diez cajas, un edificio un cuerpo más sus ventanas, y hasta las
+letras del panel son cubitos. La memoria de geometría no crece con el tamaño del
+mundo.
+
+Se crea un solo VAO y un solo VBO. El VAO recuerda cómo leer el cubo y se enlaza una
+vez por cuadro: como en OpenGL lo caro es cambiar el estado y no dibujar, todos los
+cambios de estado se concentran al principio del cuadro y después solo hay dibujados.
+
+Un uniform entero selecciona una de tres proyecciones en el mismo shader: `0` la
+escena con perspectiva, `1` el minimapa ortográfico y `2` el panel en píxeles.
 
 ## Pruebas
 
-```sh
-mvn test
-```
+`mvn test` ejecuta 38 pruebas sin ventana, repartidas en cinco clases:
 
-35 pruebas sin ventana, repartidas en cinco clases:
+| Clase | Pruebas |
+|---|---|
+| `CiudadTest` | 7 |
+| `ConduccionTest` | 6 |
+| `IluminacionTest` | 5 |
+| `CiudadCompletaTest` | 6 |
+| `TraficoTest` | 14 |
 
-- `CiudadTest`: tamaño del mapa, distribución urbana, conservación del 7x7 original,
-  red vial conectada por inundación, manzanas rodeadas de calle, centros y alturas.
-- `ConduccionTest`: calles transitables, todas las manzanas bloqueadas, radio del
-  vehículo, los cuatro bordes del mapa, reinicio y frente del vehículo.
-- `IluminacionTest`: cantidad de farolas, que estén sobre calle, dentro del mapa y
-  repartidas por los cuatro cuadrantes, y alcances suficientes.
-- `CiudadCompletaTest`: destinos sobre calle y aparcables, reparto de las paradas, ciclo
-  del semáforo, reinicio de partida y contenido del panel con caracteres que la fuente
-  puede dibujar.
-- `TraficoTest`: tres coches que arrancan sobre calle, avanzan con el tiempo, giran en las
-  esquinas sin dar media vuelta, siguen siempre una celda de calle y se reinician.
-  La más exigente simula 18000 cuadros comprobando en cada posición de cada coche que no
-  entra nunca en una manzana, que no se sale del mapa y que ningún coche se solapa con
-  otro ni con el jugador.
+La más exigente simula 18000 cuadros y comprueba en cada cuadro que ningún coche
+entra en una manzana, se sale del mapa o se solapa con otro o con el jugador.
 
 ## Limitaciones
 
-- La iluminación es local: no hay sombras ni oclusión, así que una farola puede
-  iluminar a través de un edificio.
-- Los semáforos son decorativos; no detienen al vehículo.
-- No hay peatones, sonido, modelos importados ni ruedas animadas.
-- El choque detiene el auto sin rebote: no hay recuperación automática.
-- El cielo mantiene el mismo fondo en día y en noche, para que la comparación se centres
-  en la iluminación de las superficies.
-- Siniperspectiva calculada en el shader: no se usa ninguna librería de matrices, por lo
-  que el campo de visión está fijo en 55 grados.
+- La iluminación es local: no hay sombras ni oclusión, así que una farola ilumina a
+  través de un edificio.
+- Los semáforos son decorativos y el tráfico no se detiene en ellos.
+- El choque detiene el vehículo sin rebote: si quedas encajado, usa `R`.
+- La rotación de las piezas es de un solo eje, el vertical.
+- No hay instanciación: cada pieza es una llamada de dibujado propia.
+- La fuente del panel se dibuja con cajas, una por punto encendido. Es el punto con
+  más coste del proyecto.
+- Sin librería de matrices, el campo de visión queda fijo en 55 grados.
 - En este equipo el arranque muestra un aviso de LWJGL sobre la versión de JNI al
-  ejecutarse con el JDK 25; la compilación usa el JDK 21 del *toolchain*. No afecta al
-  resultado y desaparece con JDK 17.
+  ejecutarse con el JDK 25, aunque la compilación usa el JDK 21 del *toolchain*. No
+  afecta al resultado.
 
-## Documentación de apoyo
+## Documentación
 
-- `REGLAS.md`: reglas de estilo y arquitectura que sigue el proyecto.
+La memoria de entrega con el diseño, las decisiones técnicas y el detalle de cada
+funcionamiento está en `Ciudad-interactiva-Memoria.docx`.

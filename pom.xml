@@ -164,6 +164,52 @@
                     </plugin>
                 </plugins>
             </build>
+            <dependencies>
+                <!--
+                  Binarios nativos de macOS. El pom base solo trae natives-linux, y GLFW
+                  busca su biblioteca en el classpath: sin estos classifier, macOS falla
+                  con UnsatisfiedLinkError antes incluso de abrir la ventana. Se declaran
+                  aquí y no en el pom base para que en Linux no se descargue lo que no se usa.
+                  Se incluyen los dos porque el jar de LWJGL elige la carpeta segun la
+                  arquitectura: macos/x64 para Intel y macos/arm64 para Apple Silicon.
+                -->
+                <dependency>
+                    <groupId>org.lwjgl</groupId>
+                    <artifactId>lwjgl</artifactId>
+                    <version>${lwjgl.version}</version>
+                    <classifier>natives-macos</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.lwjgl</groupId>
+                    <artifactId>lwjgl-glfw</artifactId>
+                    <version>${lwjgl.version}</version>
+                    <classifier>natives-macos</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.lwjgl</groupId>
+                    <artifactId>lwjgl-opengl</artifactId>
+                    <version>${lwjgl.version}</version>
+                    <classifier>natives-macos</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.lwjgl</groupId>
+                    <artifactId>lwjgl</artifactId>
+                    <version>${lwjgl.version}</version>
+                    <classifier>natives-macos-arm64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.lwjgl</groupId>
+                    <artifactId>lwjgl-glfw</artifactId>
+                    <version>${lwjgl.version}</version>
+                    <classifier>natives-macos-arm64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.lwjgl</groupId>
+                    <artifactId>lwjgl-opengl</artifactId>
+                    <version>${lwjgl.version}</version>
+                    <classifier>natives-macos-arm64</classifier>
+                </dependency>
+            </dependencies>
         </profile>
     </profiles>
 </project>
